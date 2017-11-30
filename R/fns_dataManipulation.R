@@ -152,10 +152,10 @@ fn_explainsTooMuch <- function(dt_, varsToCheck = NULL, targetVar = NULL){
 
     if (n_problemObs > 0){
       dt_problemCases <-
-        data.table::rbind(dt_problemCases,
+        rbind(dt_problemCases,
               dt_temp[mean == 0 | mean == 1, list(varName, featureValue, n_obs)])
       dt_explainsToMuch <-
-        data.table::rbind(dt_explainsToMuch,
+        rbind(dt_explainsToMuch,
                           data.table::data.table(varName = idx_name, n_problemObs = n_problemObs)
         )
 
@@ -268,4 +268,3 @@ fn_missingValuesImpute <-
     }
 
   }
-

@@ -22,3 +22,4 @@ a data frame with as many columns as needed for the basis
 \description{
 A function to create linear spline basis functions at given knots
 }
+
