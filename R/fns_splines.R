@@ -224,4 +224,3 @@ fn_cubicSplines_wg <- function(x, knots){
 }
 
 
->>>>>>> local initial commit
