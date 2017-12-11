@@ -17,4 +17,3 @@ normalised gini
 \description{
 Calculate normalised gini
 }
-

@@ -4,7 +4,8 @@
 \alias{fn_downsample}
 \title{Downsample a data table returning selected columns only}
 \usage{
-fn_downsample(targetVar, varsToUse, varsToAdd, dt_, method, n_max)
+fn_downsample(targetVar, varsToUse, varsToAdd, dt_, method, n_max,
+  upsampleMult = 50, seed = 2018)
 }
 \arguments{
 \item{targetVar}{the target variable.  The target variable must be 0-1}
@@ -17,17 +18,26 @@ missingInds - the missing indicators}
 
 \item{dt_}{a (training) data table to downsample}
 
-\item{method}{one of caret, imbalanced, reduce.  caret is used to downsample
-the majority class (currently assumed to be the negative-0 class)
-to the minority class.  Imbalanced downsamples but maintains a
-minimum number of the majority class. Reduce simply reduced both
-classes in the same proportion leaving n_max observations}
+\item{method}{one of (caret - now removed,) balanced, imbalanced, reduce.
+'balanced' is used to downsample the majority class 
+to the minority class.  'imbalanced' downsamples but allows the 
+the majority class to contain up to upsampleMult time as many examples
+as the minority class. 'reduce' reduces both
+classes in the same proportion leaving n_max observations.}
 
-\item{n_max}{the maximum number of examples left by 'reduce', downsampling}
+\item{n_max}{the maximum number of examples left by 'reduce' or 
+'imbalanced' downsampling}
+
+\item{seed}{seed set random before sample is used}
 }
 \value{
-a downsampled dataset
+a downsampled dataset with targetVarFac, a 0-1 factor which is 0 
+   when targetVar == 0 and 1 where targetVar > 0
 }
 \description{
-Downsample a data table returning selected columns only
+Downsample a data table returning selected columns only.  The targetVar
+parameter defines the variable which will be used for downsampling.
+targetVar is assumed to be a binomial 0-1 response or an integer (count)
+which is 0 or greater.  If the latter, all responses > 0 are grouped to
+form class 1 and the response is then treated as 0-1.
 }
