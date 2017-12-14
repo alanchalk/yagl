@@ -116,6 +116,11 @@ fn_removeRedundantCols <-
 #' @param dt_ A data table.
 #' @param varsToCheck A vector of features for this function to check.
 #' @param targetVar The target variable (currently binomial 0-1 response only).
+#' @param problemValues The means values of the response for which perfect classification
+#'   are deemed problematic.
+#'   For binomial response this may be c(0, 1).  But if the data is highly imbalanced
+#'   it is possible that only seeing a perfect response of the minority class 
+#'   is an issue.
 #'
 #' @return A data table with two columns; varName, the feature names and n_problemObs,
 #'   the number of obervations which perfectly pedict the target variable.
@@ -123,12 +128,14 @@ fn_removeRedundantCols <-
 #' @import data.table
 #' @export
 #'
-fn_explainsTooMuch <- function(dt_, varsToCheck = NULL, targetVar = NULL){
+fn_explainsTooMuch <- function(dt_, varsToCheck = NULL, targetVar = NULL,
+                               problemValues = NULL){
   # colName = "qtLag"
 
   if (is.null(varsToCheck)) stop("varsToCheck must be passed.")
   if (is.null(targetVar)) stop("A target variable must be passed.")
-
+  if (is.null(problemValues)) stop("problemValues must be passed.")
+  
   dt_explainsToMuch <- data.table::data.table(varName = character(),
                                   n_problemObs = numeric()
                                   )
@@ -148,15 +155,20 @@ fn_explainsTooMuch <- function(dt_, varsToCheck = NULL, targetVar = NULL){
                               n_obs = length(target)),
                        by = list(varName, featureValue)]
     dt_temp <- dt_temp[n_obs > 25]
-    n_problemObs <- sum(dt_temp[mean == 0 | mean == 1, n_obs])
+    n_problemObs <- sum(dt_temp[mean %in% problemValues, n_obs])
 
     if (n_problemObs > 0){
+      dt_temp <- dt_temp[mean %in% problemValues]
+      # coercion of factors is handled internally to rbind
+      if (class(dt_temp$featureValue) != 'factor'){
+        dt_temp[, featureValue := as.character(featureValue)]
+      }
       dt_problemCases <-
-        data.table::rbind(dt_problemCases,
-              dt_temp[mean == 0 | mean == 1, list(varName, featureValue, n_obs)])
+        rbind(dt_problemCases,
+              dt_temp[, list(varName, featureValue, n_obs)])
       dt_explainsToMuch <-
-        data.table::rbind(dt_explainsToMuch,
-                          data.table::data.table(varName = idx_name, n_problemObs = n_problemObs)
+        rbind(dt_explainsToMuch,
+              data.table::data.table(varName = idx_name, n_problemObs = n_problemObs)
         )
 
     }
