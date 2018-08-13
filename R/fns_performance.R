@@ -43,7 +43,6 @@ fn_deviance_binomial <- function(y, mu, wt) {
   2 * wt * (fn_y_log_y(y, mu) + fn_y_log_y(1 - y, 1 - mu))
 }
 
-
 fn_deviance_poisson <- function(y, mu, wt) {
   r <- mu * wt
   p <- which(y > 0)

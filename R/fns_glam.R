@@ -53,14 +53,14 @@ fn_prepareTrainingData <-
     # independent variables to use
     vars_indToUse <- 
         setdiff(colnames(dt_all), c(vars_targetAll, 
-                                    weightVar, 
+                                    vars_weight, 
                                     vars_fold,
                                     vars_neverToUse,
                                     vars_indNotToUse))
     
     vars_toUseAll <- c(vars_indToUse, 
-                       targetVar,
-                       weightVar,
+                       vars_targetAll,
+                       vars_weight,
                        vars_fold)
     
     vars_toDelete <- setdiff(colnames(dt_all), vars_toUseAll)
@@ -73,12 +73,12 @@ fn_prepareTrainingData <-
     vars_indToUseNonNumeric <- 
         setdiff(vars_indToUse, c(vars_indToUseNumeric, vars_missingInds))
     
-    varsToDelete <- setdiff(cnames_dt_all, vars_toUseAll)
+    vars_toDelete <- setdiff(cnames_dt_all, vars_toUseAll)
     
     # save variable choices for future reference
     save(vars_indToUse, 
          vars_indToUseNumeric, vars_indToUseNonNumeric, vars_missingInds,
-         targetVar, weightVar,
+         vars_target, vars_weight,
          file = file.path(dirRData, paste0(model_ref ,'_varsUsed.RData')))
     
     idx_train  <- which(dt_all$fold %in% train_folds)
@@ -88,7 +88,7 @@ fn_prepareTrainingData <-
             idx_train <- idx_train[sample(length(idx_train), n_train_max)]
         }  
     }
-    
+  
     dt_train = dt_all[idx_train]
     rm(dt_all); gc()
     

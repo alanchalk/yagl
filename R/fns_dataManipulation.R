@@ -27,10 +27,11 @@ fn_colNamesToDataDict <- function(dt_, tbl_dataDict){
   idx_missing <- which(is.na(idx_rename))
 
   colNames_new <- tbl_dataDict$nameInR[idx_rename]
-  colNames_new[idx_missing] <- colNames_new[idx_missing]
+  colNames_new[idx_missing] <- colNames_old[idx_missing]
+  print(c('The following column names are not in the data dictionary and will be left as is', colNames_old[idx_missing]))
   data.table::setnames(dt_, colNames_old, colNames_new)
 
-  # A data table setnames is carried out in place so no need to retrn dt_
+  # A data table setnames is carried out in place so no need to return dt_
 }
 
 
@@ -121,6 +122,8 @@ fn_removeRedundantCols <-
 #'   For binomial response this may be c(0, 1).  But if the data is highly imbalanced
 #'   it is possible that only seeing a perfect response of the minority class 
 #'   is an issue.
+#' @param thresh_n there must be >= this number of cases
+#' @param thesh_p thresh_p % or more of cases must take the problem value
 #'
 #' @return A data table with two columns; varName, the feature names and n_problemObs,
 #'   the number of obervations which perfectly pedict the target variable.
@@ -129,7 +132,8 @@ fn_removeRedundantCols <-
 #' @export
 #'
 fn_explainsTooMuch <- function(dt_, varsToCheck = NULL, targetVar = NULL,
-                               problemValues = NULL){
+                               problemValues = NULL,
+                               thresh_n = 25, thresh_p = 1){
   # colName = "qtLag"
 
   if (is.null(varsToCheck)) stop("varsToCheck must be passed.")
@@ -147,8 +151,8 @@ fn_explainsTooMuch <- function(dt_, varsToCheck = NULL, targetVar = NULL,
   for (idx_name in varsToCheck){
     # idx_name = varsToCheck[1]
     dt_temp <- data.table::data.table(varName = idx_name,
-                          target = dt_all[[targetVar]],
-                          featureValue = dt_all[[idx_name]]
+                          target = dt_[[targetVar]],
+                          featureValue = dt_[[idx_name]]
                           )
 
     dt_temp <- dt_temp[, list(mean = mean(target),
@@ -230,8 +234,8 @@ fn_checkForMAR <- function(dt_, dt_pctMissing){
   for (colName in dt_pctMissing$varName){
     # colName = dt_pctMissing$varName[1]
 
-    dt_temp <- data.table(response = dt_all[[targetVar]],
-                          feature = dt_all[[colName]])
+    dt_temp <- data.table(response = dt_[[targetVar]],
+                          feature = dt_[[colName]])
     dt_temp[!is.na(feature), varTestFac := 'NotMissing']
     dt_temp[is.na(feature),  varTestFac := 'Missing']
     ttest_result <- t.test(x = dt_temp$response[dt_temp$varTestFac =='NotMissing'],
