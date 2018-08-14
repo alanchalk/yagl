@@ -19,6 +19,7 @@
 #' @export
 #'
 #' @param x The mean prediction for which the offset (using the logit) is required 
+#' 
 fn_logit <- function(x){
   probsToUse <- copy(x)
   probsToUse[probsToUse == 0] <- exp(-10)
@@ -33,8 +34,13 @@ fn_logit <- function(x){
 #' 
 #' @export
 #'
-#' @param
-#'
+#' @param dt_all the name of the dataset
+#' @param highCardVar a vector of the hccv's
+#' @param targetVar the target variable
+#' @param exposureVar the exposure variable
+#' @param foldVar the fold variable
+#' @param foldsWithTarget folds which have the target
+#' 
 #' @return
 #'
 fn_hc <- function(dt_all, highCardVar,

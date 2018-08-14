@@ -114,6 +114,8 @@ fn_removeRedundantCols <-
 #' analysis for some other reason (such as operational).  Such variables can be an
 #' example of what is called ``leakage''.
 #'
+#' @export
+#' 
 #' @param dt_ A data table.
 #' @param varsToCheck A vector of features for this function to check.
 #' @param targetVar The target variable (currently binomial 0-1 response only).
@@ -129,11 +131,13 @@ fn_removeRedundantCols <-
 #'   the number of obervations which perfectly pedict the target variable.
 #'
 #' @import data.table
-#' @export
 #'
-fn_explainsTooMuch <- function(dt_, varsToCheck = NULL, targetVar = NULL,
+fn_explainsTooMuch <- function(dt_, 
+                               varsToCheck = NULL,
+                               targetVar = NULL,
                                problemValues = NULL,
-                               thresh_n = 25, thresh_p = 1){
+                               thresh_n = 25, 
+                               thresh_p = 1){
   # colName = "qtLag"
 
   if (is.null(varsToCheck)) stop("varsToCheck must be passed.")

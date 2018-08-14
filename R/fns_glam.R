@@ -13,9 +13,9 @@
 
 
 #--------------------------------------------------------------------------------
-#' Prepare training data
+#' Extract data for modelling or scoring
 #' 
-#' Prepares the training data, sampling the rows and limiting columns
+#' Extracts data needed for modelling, sampling the rows and limiting columns
 #' as required.  Saves details of variables used to paste0(model_ref ,'_varsUsed.RData')
 #'  
 #' @export
@@ -26,19 +26,25 @@
 #'    vars_neverToUse, vars_indNotToUse, vars_targetAll, vars_missingInds
 #' @param vars_notToUseAdditional any additional variables not to use besides
 #'    those defined in: vars_neverToUse, vars_indNotToUse
-#' @param train_folds training folds - typically 1:7
-#' @param n_train_max maximum number of training examples.  Bites if 
-#'    n_train_max is less than the number of examples in train_folds
-#' @param whereStatement_train a statement that returns TRUE / FALSE for 
+#' @param folds folds to extract.  If 'all' then all
+#' @param n_max (e.g. 1:7, 'all') maximum number of examples.  
+#'    Bites if n_max is less than the number of examples in folds.
+#'    Expected use is to limit size of training data when doing mars.
+#'    If want to use all folds set n_max = 'all'
+#' @param whereStatement a statement that returns TRUE / FALSE for 
 #'    each example, using any columns in dt_all.  For example:
 #'    lossLimit >= 225000
 #' 
-#' @return dt_train
+#' @return dt_
 #' 
-fn_prepareTrainingData <- 
-    function(fname_data, fname_vars, model_ref,
+fn_extractModelData <- 
+    function(fname_data, 
+             fname_vars, 
+             model_ref,
              vars_notToUseAdditional = NULL,
-             train_folds, n_train_max, whereStatement_train){
+             folds, 
+             n_max, 
+             whereStatement){
 
     # load dt_all
     load(file = file.path(dirRData, paste0(fname_data, '.RData')))
@@ -53,17 +59,15 @@ fn_prepareTrainingData <-
     # independent variables to use
     vars_indToUse <- 
         setdiff(colnames(dt_all), c(vars_targetAll, 
-                                    vars_weight, 
+                                    vars_weightAll, 
                                     vars_fold,
                                     vars_neverToUse,
                                     vars_indNotToUse))
     
     vars_toUseAll <- c(vars_indToUse, 
                        vars_targetAll,
-                       vars_weight,
+                       vars_weightAll,
                        vars_fold)
-    
-    vars_toDelete <- setdiff(colnames(dt_all), vars_toUseAll)
     
     # identify numeric variables
     vars_indToUseNumeric <-
@@ -77,31 +81,37 @@ fn_prepareTrainingData <-
     
     # save variable choices for future reference
     save(vars_indToUse, 
-         vars_indToUseNumeric, vars_indToUseNonNumeric, vars_missingInds,
-         vars_target, vars_weight,
+         vars_indToUseNumeric, 
+         vars_indToUseNonNumeric, 
+         vars_missingInds,
+         vars_targetAll, 
+         vars_weightAll,
          file = file.path(dirRData, paste0(model_ref ,'_varsUsed.RData')))
     
-    idx_train  <- which(dt_all$fold %in% train_folds)
+    if (identical(folds, 'all')){
+      idx_ <- 1:nrow(dt_all)
+    } else {
+      idx_ <- which(dt_all$fold %in% folds)
+    }
     
-    if (!is.null(n_train_max)){
-        if (length(idx_train) > n_train_max){
-            idx_train <- idx_train[sample(length(idx_train), n_train_max)]
+    if (!is.null(n_max)){
+        if (length(idx_) > n_max){
+            idx_ <- idx_train[sample(length(idx_), n_max)]
         }  
     }
   
-    dt_train = dt_all[idx_train]
+    dt_ <- dt_all[idx_]
+    
     rm(dt_all); gc()
     
-    n_train = nrow(dt_train)
-    
     "R code for slice of data to include (ie where statement)"
-    if(!is.null(whereStatement_train)){
-        dt_train <- dt_train[eval(parse(text = whereStatement_train))]
+    if(!is.null(whereStatement)){
+        dt_ <- dt_[eval(parse(text = whereStatement))]
     }
     
-    dt_train[, (vars_toDelete) := NULL]
+    dt_[, (vars_toDelete) := NULL]
     
-    return(dt_train)
+    return(dt_)
     
     }
 
@@ -117,10 +127,10 @@ fn_prepareTrainingData <-
 #'
 #' @export
 #'
-#' @param targetVar the target variable.  The target variable must be 0-1
-#' @param varsToUse a vector of variables to use
+#' @param var_target the target variable.  The target variable must be 0-1
+#' @param vars_toUse a vector of variables to use
 #'    (excluding the missing indicators)
-#' @param varsToAdd variables to add to varsToUse, typically the
+#' @param vars_toAdd variables to add to varsToUse, typically the
 #'    missingInds - the missing indicators
 #' @param dt_ a (training) data table to downsample
 #' @param method one of (caret - now removed,) balanced, imbalanced, reduce.
@@ -131,12 +141,13 @@ fn_prepareTrainingData <-
 #'    classes in the same proportion leaving n_max observations.
 #' @param n_max the maximum number of examples left by 'reduce' or 
 #'    'imbalanced' downsampling
-#' @param upsampleMult
+#' @param upsampleMult maxmimum size of major class as multiple of minor class
 #' @param seed seed set random before sample is used
+#' 
 #' @return a downsampled dataset with targetVarFac, a 0-1 factor which is 0 
 #'    when targetVar == 0 and 1 where targetVar > 0 
 #'
-fn_downsample <- function(targetVar, varsToUse, varsToAdd,
+fn_downsample <- function(var_target, vars_toUse, vars_toAdd,
                           dt_,
                           method,
                           n_max,
@@ -156,12 +167,12 @@ fn_downsample <- function(targetVar, varsToUse, varsToAdd,
   }
 
   set.seed(2018)
-  varsToUse <- c(varsToUse, varsToAdd)
+  vars_toUse <- c(vars_toUse, vars_toAdd)
   
-  x = copy(dt_[, varsToUse, with = FALSE])
+  x = copy(dt_[, vars_toUse, with = FALSE])
   
   targetVarFac <- 
-      ifelse(dt_[,targetVar, with = FALSE] > 0, 1, 0) %>%
+      ifelse(dt_[,var_target, with = FALSE] > 0, 1, 0) %>%
       as.factor()
 
   switch(method,
@@ -263,4 +274,182 @@ fn_earthReduceSize <- function(x){
     }
     return(x)
     
+}
+
+
+#--------------------------------------------------------------------------------
+#' Create model matrix
+#' 
+#' Create model matrix based on saved earth object and categorical
+#' variables chosen by IV
+#' 
+#' @export
+#' 
+#' @param model_ref the model reference
+#' @param dt_ the data table from which to create the model matrix
+#' @param bln_create_checkncols (TRUE or FALSE) save the number of columns
+#'        in the model matrix from numerics and from categoricals
+#' @param bln_test_ncols (TRUE or FALSE) test the number of columns
+#'        in the model matrix based on previously expected number
+#'  
+#' @return a reduced size earth object
+#' 
+fn_modelMatrix <- function(model_ref,
+                           dt_,
+                           bln_create_checkncols,
+                           bln_test_ncols){
+  
+  # load the variable  definitions:
+  # var_target, var_weight,
+  # vars_indToUse, 
+  # vars_indToUseNumeric, vars_indToUseNonNumeric, vars_missingInds,
+  # filteredNames
+  load(file = file.path(dirRData, paste0(model_ref, '_varsUsed.RData')))
+  
+  # load the earth object: earth_all
+  load(file = file.path(dirRData,
+                        paste0(model_ref, '_', 'earth_all.RData')))
+  
+  mars_ <- 
+    model.matrix(earth_all,  
+                 x = dt_[, 
+                         c(vars_indToUseNumeric, vars_missingInds),
+                         with = FALSE])[,-1] 
+  
+  # We need to figure out how there can be duplicated colums and then
+  # stop that from happening before here
+  duplicated_columns <- duplicated(t(as.matrix(mars_)))
+  mars_ <- mars_[, !duplicated_columns]
+  
+  mars_ <- Matrix(mars_, sparse = TRUE)
+  
+  # Categorical variables: Dummy coding
+  cat_ <- model.Matrix(~.,
+                       data = dt_[, filteredNames, with = FALSE],
+                       sparse = TRUE,
+                       drop.unused.levels = FALSE)[,-1, drop = FALSE]
+  
+  if (bln_create_checkncols){
+    # initialise check ncols
+    lst_checkncols <- list()
+    lst_checkncols$ncol_mars <- ncol(mars_)
+    lst_checkncols$ncol_cat <- ncol(cat_)
+    save(lst_checkncols,
+         file =  file.path(dirROutput,paste0(model_ref, '_', 'lst_checkncols.RData')))
+  }
+  
+  if (bln_test_ncols){
+    load(file =  file.path(dirROutput,paste0(model_ref, '_', 'lst_checkncols.RData')))
+    if (ncol(mars_) != lst_checkncols$ncol_mars){
+      stop("fn_modelMatrix: number of columns from mars is not as expected")
+    }
+    if (ncol(cat_) != lst_checkncols$ncol_cat){
+      stop("fn_modelMatrix: number of columns from mars is not as expected")
+      }
+  }
+  
+  # design matrix
+  X_ = cbind(mars_, cat_)
+  
+  return(X_)
+}
+
+
+#--------------------------------------------------------------------------------
+#' Scoring / predictions
+#' 
+#' Create scores / predictions, given a glmnet model and the underlying
+#' mars and categorical variables chosen by IV
+#' 
+#' @export
+#' 
+#' @param model_ref the model reference
+#' @param model_prefix the model prefix
+#' @param fname_data the name of the RData file storing dt_all 
+#' @param folds_train training folds (for rebasing if used)
+#' @param whereStatement the where statement used during training
+#' @param rebase whether or not to rebase predictions based on 
+#'        difference between mean actual and predictions on train
+#'  
+#' @return nothing is returned.  dt_preds is updated and saved
+#' 
+fn_score <- function(model_ref,
+                     model_prefix,
+                     fname_data,
+                     folds_train,
+                     whereStatement,
+                     rebase = FALSE,
+                     verbose = FALSE){
+  
+  # load the variable  definitions:
+  load(file = file.path(dirRData, paste0(model_ref, '_varsUsed.RData')))
+
+  # load the glm (m_)
+  load(file = file.path(dirRData, paste0(model_ref, '_', 'glmnet.RData')))
+  
+  # create model matrix (X_all) over all data that needs to be scored  
+  if(verbose){print('Creating model matrix...')}
+  dt_score <- 
+    mlslib::fn_extractModelData(fname_data, 
+                                fname_vars, 
+                                model_ref,
+                                vars_notToUseAdditional,
+                                folds = 'all', 
+                                n_max = NULL, 
+                                whereStatement)
+  
+  idx_train <- dt_score$fold %in% folds_train
+  
+  # Prepare model matrix
+  X_all <- fn_modelMatrix(model_ref,
+                          dt_ = dt_score,
+                          bln_create_checkncols = FALSE,
+                          bln_test_ncols = TRUE)
+  
+  # response variable
+  y_all <- dt_score[, var_target, with = FALSE][[1]]
+  
+  # weight - log for offset
+  logweight_all <- log(dt_score[, var_weight, with = FALSE][[1]])
+  
+  # clear non essential objects from memory
+  rm(dt_score); gc()
+  
+  # predict.glmnet produces predicted counts, not frequencies? offset??
+  if(verbose){print('Creating predictions...')}
+  pred_all <- predict(object = m_,
+                      newx = X_all,
+                      newoffset = logweight_all,
+                      type = "response",
+                      s = "lambda.min") %>% 
+    as.numeric()
+  
+  # Check for bias in train intercepts and adjust if needed
+  train_bias <-  sum(pred_all[idx_train]) / sum(y_all[idx_train])
+  print(paste0('The mean prediction over the mean actual
+               on the train data is: ', train_bias))
+  if (rebase & train_bias != 1){
+    pred_all <- pred_all * train_bias
+    print(paste0('Predictions have been rebased by: ', train_bias))
+  }
+  
+  # load dt_preds
+  load(file = file.path(dirRData, 
+                        paste0('04a_dt_preds_', model_prefix, '.RData'))
+  )
+  
+  if (!(identical(nrow(dt_preds), length(pred_all)))){
+    stop("Number of predictions is different to number of 
+         examples in dt_preds")
+  }
+  dt_preds[, eval(model_ref) := pred_all]
+  
+  # need model prefix
+  if(verbose){print('Saving predictions')}
+  save(dt_preds, 
+       file = file.path(dirRData, 
+                        paste0('04a_dt_preds_', model_prefix, '.RData'))
+  )
+  rm(dt_preds); gc()
+  
 }
