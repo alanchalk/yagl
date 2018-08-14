@@ -4,16 +4,16 @@
 \alias{fn_downsample}
 \title{Downsample a data table returning selected columns only}
 \usage{
-fn_downsample(targetVar, varsToUse, varsToAdd, dt_, method, n_max,
+fn_downsample(var_target, vars_toUse, vars_toAdd, dt_, method, n_max,
   upsampleMult = 50, seed = 2018)
 }
 \arguments{
-\item{targetVar}{the target variable.  The target variable must be 0-1}
+\item{var_target}{the target variable.  The target variable must be 0-1}
 
-\item{varsToUse}{a vector of variables to use
+\item{vars_toUse}{a vector of variables to use
 (excluding the missing indicators)}
 
-\item{varsToAdd}{variables to add to varsToUse, typically the
+\item{vars_toAdd}{variables to add to varsToUse, typically the
 missingInds - the missing indicators}
 
 \item{dt_}{a (training) data table to downsample}
@@ -27,6 +27,8 @@ classes in the same proportion leaving n_max observations.}
 
 \item{n_max}{the maximum number of examples left by 'reduce' or 
 'imbalanced' downsampling}
+
+\item{upsampleMult}{maxmimum size of major class as multiple of minor class}
 
 \item{seed}{seed set random before sample is used}
 }

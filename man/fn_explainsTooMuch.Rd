@@ -4,7 +4,8 @@
 \alias{fn_explainsTooMuch}
 \title{Check which features explain too much}
 \usage{
-fn_explainsTooMuch(dt_, varsToCheck = NULL, targetVar = NULL)
+fn_explainsTooMuch(dt_, varsToCheck = NULL, targetVar = NULL,
+  problemValues = NULL, thresh_n = 25, thresh_p = 1)
 }
 \arguments{
 \item{dt_}{A data table.}
@@ -12,6 +13,16 @@ fn_explainsTooMuch(dt_, varsToCheck = NULL, targetVar = NULL)
 \item{varsToCheck}{A vector of features for this function to check.}
 
 \item{targetVar}{The target variable (currently binomial 0-1 response only).}
+
+\item{problemValues}{The means values of the response for which perfect classification
+are deemed problematic.
+For binomial response this may be c(0, 1).  But if the data is highly imbalanced
+it is possible that only seeing a perfect response of the minority class 
+is an issue.}
+
+\item{thresh_n}{there must be >= this number of cases}
+
+\item{thesh_p}{thresh_p % or more of cases must take the problem value}
 }
 \value{
 A data table with two columns; varName, the feature names and n_problemObs,
