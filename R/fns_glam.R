@@ -5,11 +5,81 @@
 
 # Functions in this script:
 
-# fn_prepareTrainingData
+# fn_extractModelData
 # fn_downsample
 # fn_earthReduceSize
+# fn_modelMatrix
+# fn_score
 
 # devtools::use_package("caret")
+
+
+#--------------------------------------------------------------------------------
+#' Create dataset to store predictions (if it does not already exist)
+#' 
+#' Create dataset (dt_preds) to store predictions (if it does not already exist)
+#' an index into dt_all that is 1:1 into dt_preds is also created
+#' (e.g. prefix is m1 and both m1a, m1b = freq-sev are stored in it).
+#' Variable names in the file need to allow for modelname + varname
+#' dt_preds contains all data satisfying the where statement.
+#' Not all this data need be used for training.  In particular, earth
+#' tends to have a maximum of 2m records and even glmnet training
+#' might not use all these records.  Therefore n_train should not be 
+#' defined here.  Rather we will define n_train as the number of records
+#' used in the glm.
+#'  
+#' @export
+#' 
+#' @param model_prefix model prefix - included  defines name of stored RData file
+#'                     eg '04a_dt_preds_m1'.RData'
+#' @param fname_data filename of the RData file where dt_all is stored
+#' @param fname_vars filename of the RData file where the various vars_ 
+#'    variables are stored; i.e. vars_uniqueID, vars_weightAll, vars_fold,
+#'    vars_neverToUse, vars_indNotToUse, vars_targetAll, vars_missingInds
+#' @param whereStatement a statement that returns TRUE / FALSE for 
+#'    each example, using any columns in dt_all.  For example:
+#'    lossLimit >= 225000
+#' 
+#' @return dt_
+#' 
+fn_create_dt_preds <- function(model_prefix,
+                               fname_dt_all,
+                               fname_vars,
+                               whereStatement,
+                               verbose = FALSE){
+
+  if(verbose) {print('fn_create_dt_preds: start')}
+  
+  if(!(file.exists(file.path(dirRData, 
+                             paste0('04a_dt_preds_', model_prefix, '.RData'))))
+  ){
+    if (verbose){print("Creating dt_preds")}
+    load(file = file.path(dirRData, paste0(fname_dt_all, '.RData')))
+    load(file = file.path(dirRData, paste0(fname_vars, '.RData')))
+      
+    dt_preds <- dt_all[, unique(c(vars_uniqueID,
+                                  vars_fold,
+                                  vars_targetAll,
+                                  vars_weightAll)),
+                       with = FALSE]
+    idx_allpreds <- NULL
+    if(!is.null(whereStatement)){
+      idx_allpreds <- which(dt_preds[, eval(parse(text = whereStatement))])
+      dt_preds <- dt_preds[idx_allpreds]
+    }
+    
+    save(dt_preds, idx_allpreds, 
+         file = file.path(dirRData, 
+                          paste0('04a_dt_preds_', model_prefix, '.RData'))
+         )
+    
+    rm(dt_all, dt_preds); gc()
+  } else {
+    if (verbose){print("dt_preds already exists")}
+  }
+  if(verbose) {print('fn_create_dt_preds: end')}
+  
+  }
 
 
 #--------------------------------------------------------------------------------
@@ -80,13 +150,11 @@ fn_extractModelData <-
     vars_toDelete <- setdiff(cnames_dt_all, vars_toUseAll)
     
     # save variable choices for future reference
-    save(vars_indToUse, 
-         vars_indToUseNumeric, 
-         vars_indToUseNonNumeric, 
-         vars_missingInds,
-         vars_targetAll, 
-         vars_weightAll,
-         file = file.path(dirRData, paste0(model_ref ,'_varsUsed.RData')))
+    fn_resave(
+      vars_indToUse, 
+      vars_indToUseNumeric, 
+      vars_indToUseNonNumeric, 
+      file = file.path(dirRData, paste0(model_ref ,'_varsUsed.RData')))
     
     if (identical(folds, 'all')){
       idx_ <- 1:nrow(dt_all)
@@ -335,11 +403,11 @@ fn_modelMatrix <- function(model_ref,
     lst_checkncols$ncol_mars <- ncol(mars_)
     lst_checkncols$ncol_cat <- ncol(cat_)
     save(lst_checkncols,
-         file =  file.path(dirROutput,paste0(model_ref, '_', 'lst_checkncols.RData')))
+         file =  file.path(dirRData, paste0(model_ref, '_', 'lst_checkncols.RData')))
   }
   
   if (bln_test_ncols){
-    load(file =  file.path(dirROutput,paste0(model_ref, '_', 'lst_checkncols.RData')))
+    load(file =  file.path(dirRData, paste0(model_ref, '_', 'lst_checkncols.RData')))
     if (ncol(mars_) != lst_checkncols$ncol_mars){
       stop("fn_modelMatrix: number of columns from mars is not as expected")
     }
@@ -381,6 +449,7 @@ fn_score <- function(model_ref,
                      rebase = FALSE,
                      verbose = FALSE){
   
+  if(verbose){print('fn_score: start')}
   # load the variable  definitions:
   load(file = file.path(dirRData, paste0(model_ref, '_varsUsed.RData')))
 
@@ -416,7 +485,7 @@ fn_score <- function(model_ref,
   rm(dt_score); gc()
   
   # predict.glmnet produces predicted counts, not frequencies? offset??
-  if(verbose){print('Creating predictions...')}
+  if(verbose){print('fn_score: Creating predictions...')}
   pred_all <- predict(object = m_,
                       newx = X_all,
                       newoffset = logweight_all,
@@ -445,11 +514,129 @@ fn_score <- function(model_ref,
   dt_preds[, eval(model_ref) := pred_all]
   
   # need model prefix
-  if(verbose){print('Saving predictions')}
+  if(verbose){print('fn_score: Saving predictions')}
   save(dt_preds, 
        file = file.path(dirRData, 
                         paste0('04a_dt_preds_', model_prefix, '.RData'))
   )
   rm(dt_preds); gc()
+  if(verbose){print('fn_score: end')}
   
+}
+
+
+#--------------------------------------------------------------------------------
+#' Output results
+#' 
+#' Outputs main results to text file and run paramters to RData file
+#' 
+#' @export
+#' 
+#' @param model_ref
+#' @param model_prefix
+#'  
+#' @return nothing is returned.  .csv and .RData are saved
+#' 
+fn_outputResults <- function(model_ref
+                             ){
+  
+  load(file = file.path(dirRData, paste0(model_ref, '_', 'run_params.RData')))
+                  
+  # load: m_, n_train, time_glmnet
+  load(file = file.path(dirRData, paste0(model_ref, '_', 'glmnet.RData')))
+  
+  # load: dt_results, n_test
+  load(file = file.path(dirRData, paste0(model_ref, '_', 'dt_results.RData')))
+  
+  # load the variable  definitions:
+  # var_target, var_weight,
+  # vars_indToUse, 
+  # vars_indToUseNumeric, vars_indToUseNonNumeric, vars_missingInds,
+  # filteredNames
+  load(file = file.path(dirRData, paste0(model_ref, '_varsUsed.RData')))
+  
+  # load lst_checkncols$ncol_mars/ncol_cat
+  load(file =  file.path(dirRData, paste0(model_ref, '_', 'lst_checkncols.RData')))
+  
+  dt_results[, design_test := 'design']
+  dt_results[fold %in% folds_test, design_test := 'test']
+  dt_results_summary <- dt_results[, lapply(.SD, mean), 
+                                   by = 'design_test',
+                                   .SDcols = c('m1a_deviance', 'm1a_gini', 'm1a_ngini')]
+  
+  preTrainedEarth <- ifelse(is.null(preTrainedEarth), 'no', preTrainedEarth)
+  
+  model_info_current <- data.frame(model_prefix,
+                                   model_ref,
+                                   model_desc = model_desc,
+                                   current_time = current_time,
+                                   folds_design = paste(folds_design, collapse = ' '),
+                                   folds_test = paste(folds_test, collapse = ' '),
+                                   n_design = n_design,
+                                   n_test = n_test,
+                                   n_numeric_features = length(vars_indToUseNumeric),
+                                   n_categorical_features = length(vars_indToUseNonNumeric),
+                                   preTrainedEarth = preTrainedEarth,
+                                   nk = nk,
+                                   thresh = thresh,
+                                   penalty = penalty,
+                                   degree = degree,
+                                   IV_threshold = IV_threshold,
+                                   n_cat = lst_checkncols$ncol_cat,
+                                   n_mars = lst_checkncols$ncol_mars,
+                                   n_manInt = n_manInt,
+                                   alpha = alpha,
+                                   constrained = constrained,
+                                   dev_design   = dt_results_summary[1, 2, with = FALSE],
+                                   gini_design  = dt_results_summary[1, 3, with = FALSE],
+                                   ngini_design = dt_results_summary[1, 4, with = FALSE],
+                                   dev_test     = dt_results_summary[2, 2, with = FALSE],
+                                   gini_test    = dt_results_summary[2, 3, with = FALSE],
+                                   ngini_test   = dt_results_summary[2, 4, with = FALSE],
+                                   time_glmnet_mins = time_glmnet[[3]]/60,
+                                   workers = workers) 
+  
+  # append results to results.csv
+  write.table(model_info_current,
+              file = file.path(dirROutput,'04__results.csv'),
+              row.names = FALSE,
+              col.names = FALSE,
+              append = TRUE,
+              sep = ",")
+  
+  # save run parameters
+  # idea is that it should be possible to replicate all results based
+  # on this file and the data it refers to
+  save(# Model reference and description
+    model_prefix,
+    model_ref,
+    model_desc,
+    # specific variable definitions for this model
+    var_target,
+    var_weight,
+    m_family,
+    vars_notToUseAdditional,
+    whereStatement,
+    workers,
+    folds_design,
+    folds_test,
+    # control variables: earth
+    preTrainedEarth,
+    nk,
+    thresh,
+    penalty,
+    degree,
+    # control variables: IV
+    IV_threshold,
+    # control variables: glm 
+    alpha,
+    # control variables: interactions
+    n_manInt,
+    # other variables
+    current_time,
+    n_max_earth,
+    n_max_glm,
+    seed,
+    file = file.path(dirRData, paste0(model_ref, '_', 'run_params.RData'))
+  )
 }

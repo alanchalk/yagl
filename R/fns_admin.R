@@ -4,10 +4,8 @@
 
 # Functions in this script:
 
-# fn_prepareTrainingData
-# fn_downsample
-# fn_earthReduceSize
-
+# fn_pkgInstallLoad
+# 
 
 
 #--------------------------------------------------------------------------------
@@ -37,3 +35,22 @@ fn_pkgInstallLoad <- function(x)
 } 
 
 
+#--------------------------------------------------------------------------------
+#' Update an existing .RData store
+#' 
+#' Update an existing .RData store
+#' source: https://stackoverflow.com/questions/11813096/updating-an-existing-rdata-file 
+#' @export
+#' 
+#' @param ... new or updated objects to add
+#' @param dt_ the data table from which to create the model matrix
+#' @param file the .RData file to update
+#'   
+#' @return a reduced size earth object
+#' 
+fn_resave <- function(..., list = character(), file) {
+  previous  <- load(file)
+  var_names <- c(list, as.character(substitute(list(...)))[-1L])
+  for (var in var_names) assign(var, get(var, envir = parent.frame()))
+  save(list = unique(c(previous, var_names)), file = file)
+}
