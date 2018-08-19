@@ -285,9 +285,9 @@ fn_chartQuotientPctDenom <-
 #'
 #' @export
 #' 
-#' @param fname_data the filename for the data file
-#' @param fname_vars the file name for variable information
+#' @param fname_dt_all the filename for the data file
 #' @param model_ref the reference name for the model
+#' @param model_prefix the prefix name for the model
 #' @param x_var the variable for the x-axis
 #' @param x_lbl the label for the x-axis 
 #' @param x_maxLevels maximum number of graphed levels for x variable
@@ -310,9 +310,9 @@ fn_chartQuotientPctDenom <-
 #' @return a ggplot object
 #'
 fn_chart_meanPredActual <- 
-  function(fname_data, 
-           fname_vars, 
+  function(fname_dt_all, 
            model_ref,
+           model_prefix,
            x_var, x_lbl,
            x_maxLevels = NULL,
            denominator_var, denominator_lbl,
@@ -328,13 +328,16 @@ fn_chart_meanPredActual <-
     
     if(verbose){print('fn_chart_meanPredActual: loading data...')}
     # load data and variables
-    load(file = file.path(dirRData, paste0(fname_dt_all, '.RData')))
+    if(!exists('dt_all')){
+      load(file = file.path(dirRData, paste0(fname_dt_all, '.RData')))
+    }
     
     # dt_preds, idx_allpreds
-    load(file = file.path(dirRData, 
+    if(!exists('dt_preds')){
+      load(file = file.path(dirRData, 
                           paste0('04a_dt_preds_', model_prefix, '.RData'))
-    )
-    load(file = file.path(dirRData, paste0(fname_vars, '.RData')))
+      )}
+    load(file = file.path(dirRData, paste0(model_ref ,'_varsUsed.RData')))
     load(file = file.path(dirRData, paste0(model_ref, '_', 'run_params.RData')))
 
     # define dt_
@@ -519,7 +522,6 @@ fn_chart_meanPredActual <-
 #' @export
 #' 
 #' @param fname_data the filename for the data file
-#' @param fname_vars the file name for variable information
 #' @param model_ref the reference name for the model
 #' @param x_var the variable for the x-axis 
 #' @param x_lbl the variable and label for the x-axis 
@@ -550,10 +552,8 @@ fn_chart_meanPredActual <-
 #' 
 fn_chart_meanPredActualRel <- 
   function(fname_data, 
-           fname_vars, 
            model_ref,
            x_var, x_lbl,
-           var_target, modelData,
            x_maxLevels = NULL,
            denominator_var, denominator_lbl,
            numerator_var, numerator_lbl, 
@@ -583,8 +583,8 @@ fn_chart_meanPredActualRel <-
     # dt_preds, idx_allpreds
     load(file = file.path(dirRData, 
                           paste0('04a_dt_preds_', model_prefix, '.RData'))
-    )
-    load(file = file.path(dirRData, paste0(fname_vars, '.RData')))
+         )
+    load(file = file.path(dirRData, paste0(model_ref ,'_varsUsed.RData')))
     load(file = file.path(dirRData, paste0(model_ref, '_', 'run_params.RData')))
     
     # define dt_
@@ -810,7 +810,93 @@ fn_chart_meanPredActualRel <-
     }
     
     rm(dt_, x_lbl)
+    
+    # to print
+    if(print) {
+      if(verbose){print('fn_chart_meanPredActual: printing graph...')}
+      print(gg_1)}
+    
+    # to save results
+    if(save){
+      if(verbose){print('fn_chart_meanPredActual: saving graph...')}
+      jpeg(file.path(dirROutput, 
+                     paste0('04s_meanPredActualRel_', model_prefix, '_', x_var, '.jpeg')),
+           width = 3500, height = 2500,
+           pointsize = 16, quality = 100, res = 500)
+      print(gg_1)
+      dev.off()
+    }
     return(gg_1)
   }
 
 
+#--------------------------------------------------------------------------------
+#' Loop over all vars_indToUse of chart of mean actual and preditions
+#'
+#' @export
+#' 
+#' @param fname_data the filename for the data file
+#' @param model_ref the reference name for the model
+#' @param x_var the variable for the x-axis
+#' @param x_lbl the label for the x-axis 
+#' @param x_maxLevels maximum number of graphed levels for x variable
+#' @param denominator_var denominator variable name
+#' @param denominator_lbl denominator label
+#' @param numerator_var numerator variable name
+#' @param numerator_lbl numerator label
+#' @param quotient_lbl a label for the resulting quotient
+#' @param rebase: Default = TRUE     
+#' @param quotient_baseLevel: Second rebase level for the quotient.  
+#'                             Deault = 1.  If rebase is on, this is always done first
+#'                             Use can be for client who prefer to view 
+#'                             an average loss ratio of 75% or whatever, rather 
+#'                             than 100% where the focus is on relativities only
+#' @param missValue
+#' @param print
+#' @param save
+#' @param verbose
+#'
+#' @return nothing is returned.  Graphs are saved.
+#'
+fn_chart_meanPredActual_loop <-
+  function(fname_dt_all, 
+           model_ref,
+           x_var, x_lbl,
+           x_maxLevels = NULL,
+           denominator_var, denominator_lbl,
+           numerator_var, numerator_lbl, 
+           quotient_lbl, 
+           rebase = TRUE, quotient_baseLevel = 1,
+           missValue = NULL,
+           print = TRUE,
+           save = TRUE,
+           verbose = FALSE){
+    
+    load(file = file.path(dirRData, paste0(fname_dt_all, '.RData')))
+    load(file = file.path(dirRData, paste0(model_ref, '_varsUsed.RData')))
+    load(file = file.path(dirRData, paste0(model_ref, '_', 'run_params.RData')))
+    
+    x_vars <-  vars_indToUse
+    x_lbls <-  vars_indToUse
+    
+    for(idx in 1:length(x_vars)){ #idx = 2
+      print(paste0(idx, ' of ', length(x_vars)))
+      # note: in the call below the parameters are being passed
+      #  based on the loop function call parameters
+      mlslib::fn_chart_meanPredActual(
+        fname_dt_all = fname_dt_all, 
+        model_ref = model_ref,
+        model_prefix = model_prefix,
+        x_var = x_vars[idx], x_lbl = x_lbls[idx],
+        x_maxLevels = x_maxLevels,
+        denominator_var = denominator_var,
+        denominator_lbl = denominator_lbl,
+        numerator_var = numerator_var,
+        numerator_lbl = numerator_lbl,
+        quotient_lbl = quotient_lbl,
+        rebase = rebase, quotient_baseLevel = quotient_baseLevel,
+        print,
+        save,
+        verbose)
+    }
+  }
