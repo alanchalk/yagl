@@ -149,7 +149,7 @@ fn_chartQuotientPctDenom <-
                       ),
                       by = list(x_var)]
     }
-    rm(dt_)
+    #rm(dt_)
     
     #   3. Rebase denominator_var to numerator_var 
     dt_ <- fn_rebaseSecondArgToFirstArg(

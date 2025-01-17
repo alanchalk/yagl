@@ -1,10 +1,10 @@
-Package: mlslib
+Package: yagl
 Type: Package
 Title: auto-glm
 Version: 0.1.0
 Author: Alan Chalk, Tony Ward
 Maintainer: The package maintainer <alanchalk@gmail.com>
-Description: Functions to assist in the auto-glm pipeline
+Description: Functions to assist in an auto-glm pipeline
     Includes data manipulation.
 License: What license is it under?
 Encoding: UTF-8

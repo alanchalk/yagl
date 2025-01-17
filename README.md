@@ -1,2 +1,2 @@
-# mlslib
+# yagl
 Auto glm pipeline
